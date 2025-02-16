@@ -33,12 +33,8 @@ const emit = defineEmits(['update:modelValue'])
 const exchanges = [
   { id: 'Binance', name: 'Binance' },
   { id: 'Bybit', name: 'Bybit' },
-  { id: 'KuCoin', name: 'KuCoin' },
   { id: 'OKX', name: 'OKX' },
-  { id: 'Bitget', name: 'Bitget' },
-  { id: 'Huobi', name: 'Huobi' },
-  { id: 'Gate.io', name: 'Gate.io' },
-  { id: 'Kraken', name: 'Kraken' }
+  { id: 'Huobi', name: 'Huobi' }
 ]
 
 // Вычисляемое свойство для двустороннего связывания данных

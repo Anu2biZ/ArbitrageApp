@@ -27,23 +27,30 @@ interface QueryParams {
 }
 
 /**
- * Конфигурация торговых пар
+ * Конфигурация монет
  * base - базовая цена для генерации случайных цен
  * volume - базовый объем для генерации случайных объемов
  */
-const PAIRS = {
-    'BTC/USDT': { base: 45000, volume: 100000 },
-    'ETH/USDT': { base: 2500, volume: 50000 },
-    'SOL/USDT': { base: 100, volume: 25000 },
-    'AVAX/USDT': { base: 35, volume: 20000 },
-    'BNB/USDT': { base: 300, volume: 30000 },
-    'XRP/USDT': { base: 0.5, volume: 15000 },
-    'ADA/USDT': { base: 0.4, volume: 10000 },
-    'MATIC/USDT': { base: 0.8, volume: 12000 }
+const COINS = {
+    'BTC': { base: 45000, volume: 100000 },
+    'ETH': { base: 2500, volume: 50000 },
+    'SOL': { base: 100, volume: 25000 },
+    'AVAX': { base: 35, volume: 20000 },
+    'BNB': { base: 300, volume: 30000 },
+    'XRP': { base: 0.5, volume: 15000 },
+    'ADA': { base: 0.4, volume: 10000 },
+    'MATIC': { base: 0.8, volume: 12000 },
+    'DOT': { base: 7, volume: 18000 },
+    'DOGE': { base: 0.08, volume: 8000 },
+    'SHIB': { base: 0.00001, volume: 5000 },
+    'LINK': { base: 15, volume: 20000 },
+    'UNI': { base: 5, volume: 15000 },
+    'ATOM': { base: 10, volume: 20000 },
+    'TRX': { base: 0.08, volume: 10000 }
 }
 
 // Список поддерживаемых бирж
-const EXCHANGES = ['Binance', 'Bybit', 'KuCoin', 'OKX', 'Bitget', 'Huobi', 'Gate.io', 'Kraken']
+const EXCHANGES = ['Binance', 'Bybit', 'OKX', 'Huobi']
 
 export default defineEventHandler(async (event) => {
     const query = getQuery(event)
@@ -89,11 +96,8 @@ export default defineEventHandler(async (event) => {
         if (buyExchanges.length > 0 && !buyExchanges.includes(opp.buyExchange)) return false
         if (sellExchanges.length > 0 && !sellExchanges.includes(opp.sellExchange)) return false
 
-        // Проверяем валюты только если они выбраны
-        if (currencies.length > 0) {
-            const [baseCurrency] = opp.coin.split('/')
-            if (!currencies.includes(baseCurrency)) return false
-        }
+        // Проверяем монеты только если они выбраны
+        if (currencies.length > 0 && !currencies.includes(opp.coin)) return false
         
         // Проверяем спред если он указан в query параметрах
         const spread = query.spread ? Number(query.spread) : 0
@@ -138,14 +142,15 @@ export default defineEventHandler(async (event) => {
  */
 function generatePrice(basePrice: number): number {
     const variation = (Math.random() - 0.5) * 0.02 // ±1% variation
-    return +(basePrice * (1 + variation)).toFixed(2)
+    const price = basePrice * (1 + variation)
+    return +price.toFixed(basePrice < 0.01 ? 8 : 2) // Больше десятичных знаков для мелких монет
 }
 
 /**
  * Генерация массива арбитражных возможностей
  * 
  * Процесс генерации:
- * 1. Для каждой возможности выбирается случайная пара
+ * 1. Для каждой возможности выбирается случайная монета
  * 2. Выбираются случайные биржи для покупки и продажи
  * 3. Генерируются цены с положительным спредом
  * 4. Рассчитываются объем, спред и прибыль
@@ -155,10 +160,10 @@ function generatePrice(basePrice: number): number {
  */
 function generateManyOpportunities(count: number) {
     const opportunities: Opportunity[] = []
-    const pairs = Object.entries(PAIRS)
+    const coins = Object.entries(COINS)
 
     for (let i = 0; i < count; i++) {
-        const [pair, { base: basePrice, volume: baseVolume }] = pairs[i % pairs.length]
+        const [coin, { base: basePrice, volume: baseVolume }] = coins[i % coins.length]
         const buyExchange = EXCHANGES[Math.floor(Math.random() * EXCHANGES.length)]
         let sellExchange
         do {
@@ -180,7 +185,7 @@ function generateManyOpportunities(count: number) {
 
         opportunities.push({
             id: i + 1,
-            coin: pair,
+            coin,
             buyExchange,
             sellExchange,
             spread,

@@ -40,10 +40,11 @@
 import { BellIcon, UserCircleIcon } from '@heroicons/vue/24/outline'
 
 const navigation = [
-  { name: 'Виды арбитража', path: '/arbitrage' },
-  { name: 'Видео', path: '/video' },
+  { name: 'Дашборд', path: '/dashboard' },
   { name: 'Сканер', path: '/scanner' },
+  { name: 'Виды арбитража', path: '/arbitrage' },
   { name: 'Тарифы', path: '/tariffs' },
+  { name: 'Видео', path: '/video' },
   { name: 'Партнеры', path: '/partners' }
 ]
 </script>

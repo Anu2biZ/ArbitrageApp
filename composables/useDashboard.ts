@@ -1,7 +1,12 @@
-export const useDashboard = () => {
-    const { data: dashboardData } = useFetch('/api/dashboard')
+import { useFetch } from 'nuxt/app'
 
-    const formatUSD = (value) => {
+export const useDashboard = () => {
+    const { data: dashboardData, refresh } = useFetch('/api/dashboard', {
+        key: 'dashboard',
+        watch: false
+    })
+
+    const formatUSD = (value: number | undefined) => {
         if (!value) return '$0.00'
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
@@ -11,6 +16,7 @@ export const useDashboard = () => {
 
     return {
         dashboardData,
-        formatUSD
+        formatUSD,
+        refresh
     }
 }

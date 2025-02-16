@@ -28,7 +28,7 @@
  *    - Пагинация результатов для оптимизации отображения
  */
 import { storeToRefs } from 'pinia'
-import { useScannerStore, PAIRS } from '~/store/scanner'
+import { useScannerStore, COINS } from '~/store/scanner'
 import { useFormatting } from '~/composables/useFormatting'
 import ExchangeSelector from "~/components/scanner/ExchangeSelector.vue"
 import CurrencySelector from "~/components/scanner/CurrencySelector.vue"
@@ -68,7 +68,13 @@ watch([selectedBuyExchanges, selectedSellExchanges, selectedCurrencies], ([buy, 
  * 3. Настройка обработчиков WebSocket событий
  * 4. Отслеживание изменений периода обновления
  */
+// Запрос разрешения на уведомления при монтировании
 onMounted(async () => {
+  // Запрашиваем разрешение на уведомления
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission()
+  }
+
   // Загрузка начальных данных с сервера
   await store.fetchOpportunities()
 
@@ -253,16 +259,27 @@ const handleSort = (field) => {
           <td class="text-center">{{ formatUSD(item.sellPrice) }}</td>
           <td class="text-center">{{ item.sellExchange }}</td>
           <td class="text-center">
-            <div class="text-gray-400 text-sm">{{ formatUSD((item.sellPrice - item.buyPrice) * item.volume / PAIRS[item.coin].base) }}</div>
+            <div class="text-gray-400 text-sm">{{ formatUSD((item.sellPrice - item.buyPrice) * item.volume / COINS[item.coin].base) }}</div>
             <div class="text-green-500">{{ item.spread }}%</div>
           </td>
           <td class="text-center">{{ formatUSD(item.volume) }}</td>
           <td class="text-center text-gray-400">{{ formatUSD(item.volume * 0.002) }}</td>
           <td class="text-center text-green-500">{{ formatUSD(item.profit) }}</td>
           <td class="text-center">
-            <button class="bg-blue-600 px-4 py-1 rounded text-sm hover:bg-blue-700 transition-colors">
-              Старт
-            </button>
+            <div class="flex items-center justify-center gap-2">
+              <input 
+                type="number" 
+                v-model="item.quantity" 
+                class="w-20 bg-gray-700 text-white rounded px-2 py-1 text-sm"
+                placeholder="Кол-во"
+              >
+              <button 
+                @click="store.startArbitrage({...item, volume: item.quantity * COINS[item.coin].base})"
+                :disabled="!item.quantity"
+                class="bg-blue-600 px-4 py-1 rounded text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                Старт
+              </button>
+            </div>
           </td>
         </tr>
         </tbody>

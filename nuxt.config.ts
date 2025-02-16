@@ -6,14 +6,29 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@vueuse/nuxt'
   ],
-  websocketsServer: {
-    url: 'ws://localhost:3000'
-  },
-  router: {
-    middleware: ['auth'] 
+  runtimeConfig: {
+    public: {
+      websocketUrl: 'ws://localhost:3001'
+    }
   },
   nitro: {
-    plugins: ['~/server/websocket/scanner.ts']
+    plugins: ['~/server/websocket/scanner.ts'],
+    routeRules: {
+      '/api/**': {
+        cors: true,
+        headers: {
+          'Access-Control-Allow-Methods': 'GET,HEAD,PUT,PATCH,POST,DELETE',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': '*',
+          'Content-Type': 'application/json'
+        }
+      },
+      '/ws': {
+        headers: {
+          'Access-Control-Allow-Origin': '*'
+        }
+      }
+    }
   },
 
   css: ['~/assets/css/tailwind.css'],
