@@ -1,9 +1,37 @@
-<!-- pages/scanner/index.vue -->
 <script setup>
+/**
+ * Страница межбиржевого сканера
+ * 
+ * Предназначение:
+ * - Отображает интерфейс для поиска арбитражных возможностей между биржами
+ * - Позволяет настраивать параметры сканирования и фильтрации результатов
+ * - Отображает найденные возможности в виде таблицы с сортировкой
+ * 
+ * Основные компоненты:
+ * 1. Селекторы бирж для покупки и продажи
+ * 2. Селектор валютных пар
+ * 3. Настройки фильтрации (объемы, прибыль, спред, комиссии)
+ * 4. Таблица результатов с пагинацией
+ * 
+ * Логика работы:
+ * 1. При монтировании компонента:
+ *    - Загружаются начальные данные
+ *    - Устанавливается WebSocket соединение для real-time обновлений
+ * 2. При изменении фильтров:
+ *    - Сбрасывается пагинация на первую страницу
+ *    - Запрашиваются новые данные
+ * 3. WebSocket обновления:
+ *    - Получение актуальных цен в реальном времени
+ *    - Обновление периода получения данных
+ * 4. Сортировка и пагинация:
+ *    - Возможность сортировки по любому столбцу
+ *    - Пагинация результатов для оптимизации отображения
+ */
 import { storeToRefs } from 'pinia'
-import { useScannerStore } from '~/store/scanner'
+import { useScannerStore, PAIRS } from '~/store/scanner'
 import { useFormatting } from '~/composables/useFormatting'
 import ExchangeSelector from "~/components/scanner/ExchangeSelector.vue"
+import CurrencySelector from "~/components/scanner/CurrencySelector.vue"
 import Pagination from "~/components/ui/Pagination.vue"
 
 const store = useScannerStore()
@@ -11,22 +39,88 @@ const { formatUSD } = useFormatting()
 const { opportunities, summary, total } = storeToRefs(store)
 const selectedBuyExchanges = ref([])
 const selectedSellExchanges = ref([])
+const selectedCurrencies = ref([])
 
-onMounted(() => {
-  const ws = new WebSocket('ws://localhost:3001')
+// Отслеживание изменений фильтров
+watch(() => store.filters, () => {
+  store.page = 1 // Сбрасываем на первую страницу при изменении фильтров
+  store.fetchOpportunities()
+}, { deep: true })
 
-  ws.onopen = () => console.log('Connected')
-  ws.onerror = (error) => console.error('WebSocket error:', error)
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    if (data.type === 'price_updates') {
-      store.updatePrices(data.data)
-    }
-  }
-
+// Отслеживание изменений страницы пагинации
+watch(() => store.page, () => {
   store.fetchOpportunities()
 })
 
+// Отслеживание изменений в выбранных биржах и валютах
+watch([selectedBuyExchanges, selectedSellExchanges, selectedCurrencies], ([buy, sell, currencies]) => {
+  store.filters.buyExchanges = buy
+  store.filters.sellExchanges = sell
+  store.filters.currencies = currencies
+  store.page = 1 // Сбрасываем на первую страницу при изменении выбранных бирж или валют
+  store.fetchOpportunities()
+}, { deep: true })
+
+/**
+ * Инициализация компонента при монтировании
+ * 1. Загрузка начальных данных
+ * 2. Установка WebSocket соединения
+ * 3. Настройка обработчиков WebSocket событий
+ * 4. Отслеживание изменений периода обновления
+ */
+onMounted(async () => {
+  // Загрузка начальных данных с сервера
+  await store.fetchOpportunities()
+
+  const ws = new WebSocket('ws://localhost:3001')
+  const wsRef = ref(null)
+
+  ws.onopen = () => {
+    console.log('Connected to WebSocket')
+    wsRef.value = ws
+    // Отправляем начальный период обновления
+    ws.send(JSON.stringify({
+      type: 'set_update_period',
+      period: store.filters.updatePeriod
+    }))
+  }
+
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error)
+    // При ошибке WebSocket пробуем перезагрузить данные
+    store.fetchOpportunities()
+  }
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      if (data.type === 'price_updates') {
+        store.updatePrices(data.data)
+      }
+    } catch (error) {
+      console.error('Error processing WebSocket message:', error)
+    }
+  }
+
+  // Следим за изменением периода обновления
+  watch(() => store.filters.updatePeriod, (newPeriod) => {
+    if (wsRef.value && wsRef.value.readyState === WebSocket.OPEN) {
+      wsRef.value.send(JSON.stringify({
+        type: 'set_update_period',
+        period: newPeriod
+      }))
+    }
+  })
+
+  // Очистка при размонтировании компонента
+  onUnmounted(() => {
+    if (wsRef.value) {
+      wsRef.value.close()
+    }
+  })
+})
+
+// Конфигурация столбцов таблицы результатов
 const columns = [
   { field: 'coin', label: 'Монета' },
   { field: 'buyPrice', label: 'Цена покупки' },
@@ -35,9 +129,17 @@ const columns = [
   { field: 'sellExchange', label: 'Биржа продажи' },
   { field: 'spread', label: 'Спред, %' },
   { field: 'volume', label: 'Объём' },
+  { field: 'commission', label: 'Комиссия' },
   { field: 'profit', label: 'Профит' }
 ]
 
+/**
+ * Обработчик сортировки таблицы
+ * При клике на заголовок столбца:
+ * - Если это текущее поле сортировки - меняет направление (asc/desc)
+ * - Если это новое поле - устанавливает desc направление
+ * @param {string} field - Поле для сортировки
+ */
 const handleSort = (field) => {
   store.sort.direction = store.sort.field === field
       ? store.sort.direction === 'asc' ? 'desc' : 'asc'
@@ -64,6 +166,11 @@ const handleSort = (field) => {
 
     <div class="bg-gray-800 rounded-lg p-6 mb-6">
       <h3 class="text-white mb-4">Настройте параметры</h3>
+      <div class="mb-6">
+        <h4 class="text-white mb-2">Валюты</h4>
+        <CurrencySelector v-model="selectedCurrencies" />
+      </div>
+
       <div class="grid grid-cols-3 gap-6">
         <div>
           <label class="text-gray-400 text-sm mb-2 block">Минимальный объём, $</label>
@@ -111,6 +218,15 @@ const handleSort = (field) => {
         </span>
       </div>
 
+      <div class="mb-4">
+        <Pagination
+            :total="total"
+            :current-page="store.page"
+            :per-page="store.limit"
+            @change="page => store.page = page"
+        />
+      </div>
+
       <table class="w-full">
         <thead>
         <tr class="text-gray-400 border-b border-gray-700">
@@ -136,8 +252,12 @@ const handleSort = (field) => {
           <td class="text-center">{{ item.buyExchange }}</td>
           <td class="text-center">{{ formatUSD(item.sellPrice) }}</td>
           <td class="text-center">{{ item.sellExchange }}</td>
-          <td class="text-center text-green-500">{{ item.spread }}%</td>
+          <td class="text-center">
+            <div class="text-gray-400 text-sm">{{ formatUSD((item.sellPrice - item.buyPrice) * item.volume / PAIRS[item.coin].base) }}</div>
+            <div class="text-green-500">{{ item.spread }}%</div>
+          </td>
           <td class="text-center">{{ formatUSD(item.volume) }}</td>
+          <td class="text-center text-gray-400">{{ formatUSD(item.volume * 0.002) }}</td>
           <td class="text-center text-green-500">{{ formatUSD(item.profit) }}</td>
           <td class="text-center">
             <button class="bg-blue-600 px-4 py-1 rounded text-sm hover:bg-blue-700 transition-colors">
@@ -159,4 +279,3 @@ const handleSort = (field) => {
     </div>
   </div>
 </template>
-

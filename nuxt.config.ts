@@ -1,3 +1,5 @@
+import { defineNuxtConfig } from 'nuxt/config'
+
 export default defineNuxtConfig({
   modules: [
     '@pinia/nuxt',
@@ -8,10 +10,10 @@ export default defineNuxtConfig({
     url: 'ws://localhost:3000'
   },
   router: {
-    middleware: ['auth']
+    middleware: ['auth'] 
   },
   nitro: {
-    websocket: true
+    plugins: ['~/server/websocket/scanner.ts']
   },
 
   css: ['~/assets/css/tailwind.css'],
